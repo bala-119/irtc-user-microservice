@@ -3,7 +3,7 @@ const jwt = require("jsonwebtoken")
 class JsonwebTokenHandler{
 
     
-        createToken(user) {
+    createToken(user) {
         try {
 
             const payload = {
@@ -38,7 +38,7 @@ class JsonwebTokenHandler{
         try{
             const decoded = jwt.verify(token,
                 process.env.JWT_SECRET
-            )
+            );
             return decoded;
         }catch(error)
         {

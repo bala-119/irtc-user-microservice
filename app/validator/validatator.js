@@ -1,73 +1,87 @@
-const joi = require("joi");
-const { statusCodes } = require("../response/httpStatusCodes");
-const { statusMessage } = require("../response/httpStatusMessages");
+const Joi = require("joi");
 
-const { joierrors } = require("../response/response");
-const options = {
-  // generic option
-  basic: {
-    abortEarly: false,
-    convert: true,
-    allowUnknown: false,
-    stripUnknown: true,
-  },
-  // Options for Array of array
-  array: {
-    abortEarly: false,
-    convert: true,
-    allowUnknown: true,
-    stripUnknown: {
-      objects: true,
-    },
-  },
-};
+// REGISTER
+const registerSchema = Joi.object({
+  fullName: Joi.string().trim().min(3).max(50).required(),
+  user_name: Joi.string().trim().min(3).max(30).required(),
+  email: Joi.string().trim().email().required(),
+  phone: Joi.string().trim().pattern(/^\+91\d{10}$/).required(),
+  password: Joi.string().trim().min(6).required(),
+  role: Joi.string().trim().valid("user", "admin").default("user")
+});
 
-const bodyParamValidation = (req, res, next, schama) => {
-  let schema = schama;
-  let option = options.basic;
-  var { error, value } = schema.validate(req.body, option);
-  if (error && Object.keys(error).length > 0) {
-    joierrors(
-      req,
-      res,
-      statusCodes.HTTP_BAD_REQUEST,
-      statusMessage[400],
-      error
-    );
-  } else {
-    next();
-  }
-};
+// LOGIN
+const loginSchema = Joi.object({
+  email: Joi.string().trim().email().required(),
+  password: Joi.string().trim().required()
+});
 
-const queryParamValidation = (req, res, next, schama) => {
-  let schema = schama;
-  let option = options.basic;
-  var { error, value } = schema.validate(req.query, option);
-  if (error && Object.keys(error).length > 0) {
-    joierrors(
-      req,
-      res,
-      statusCodes.HTTP_BAD_REQUEST,
-      statusMessage[400],
-      error
-    );
-  } else {
-    if (req?.bodyParam) return;
-    else next();
-    // next();
-  }
-};
+// MPIN LOGIN
+const mpinLoginSchema = Joi.object({
+  phone: Joi.string().required(),
+  mpin: Joi.string().length(5).required()
+});
 
-const adminloginSchema = (req, res, next) => {
-  const schema = joi.object({
-    email: joi.string().email().required(),
-    password: joi.string().required(),
-  });
-  return bodyParamValidation(req, res, next, schema);
-};
+// UPDATE MPIN
+const updateMpinSchema = Joi.object({
+  mpin: Joi.string().length(5).required()
+});
 
+// UPDATE PASSWORD
+const updatePasswordSchema = Joi.object({
+  password: Joi.string().min(6).required()
+});
 
+// EMAIL OTP
+const emailOtpSchema = Joi.object({
+  email: Joi.string().email().required()
+});
+
+const verifyEmailOtpSchema = Joi.object({
+  email: Joi.string().email().required(),
+  otp: Joi.string().required()
+});
+
+// MOBILE OTP
+const mobileOtpSchema = Joi.object({
+  mobile: Joi.string().required()
+});
+
+const verifyMobileOtpSchema = Joi.object({
+  mobile: Joi.string().required(),
+  otp: Joi.string().required()
+});
+
+// RESET PASSWORD
+const resetPasswordSchema = Joi.object({
+  email: Joi.string().email().required(),
+  otp: Joi.string().required(),
+  newPassword: Joi.string().min(6).required()
+});
+
+// AADHAAR
+const aadhaarSchema = Joi.object({
+  aadhaarId: Joi.string().length(12).required()
+});
+
+// UPDATE PROFILE
+const updateProfileSchema = Joi.object({
+  fullName: Joi.string().min(3),
+  email: Joi.string().email(),
+  phone: Joi.string()
+});
 
 module.exports = {
-  adminloginSchema
+  registerSchema,
+  loginSchema,
+  mpinLoginSchema,
+  updateMpinSchema,
+  updatePasswordSchema,
+  emailOtpSchema,
+  verifyEmailOtpSchema,
+  mobileOtpSchema,
+  verifyMobileOtpSchema,
+  resetPasswordSchema,
+  aadhaarSchema,
+  updateProfileSchema
 };

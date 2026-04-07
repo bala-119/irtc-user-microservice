@@ -1,11 +1,39 @@
-const { response } = require("express");
 const User = require("../models/user_model");
 const bcrypt = require("bcrypt");
 const axios = require("axios");
 const jsonwebtoken = require("../helpers/jsonwebtoken");
 
-class UserService {
+const {
+  updateMpinSchema,
+  updatePasswordSchema,
+  updateProfileSchema,
+  mobileOtpSchema,
+  verifyMobileOtpSchema,
+  emailOtpSchema,
+  verifyEmailOtpSchema,
+  aadhaarSchema
+} = require("../validator/user_validatator");
 
+// Validation helper
+const validate = (schema, data) => {
+  const { error, value } = schema.validate(data, { abortEarly: false });
+  if (error) {
+    const errors = error.details.map(detail => ({
+      field: detail.path[0],
+      message: detail.message
+    }));
+    throw {
+      status: 400,
+      success: false,
+      message: "Validation failed",
+      errors
+    };
+  }
+  return value;
+};
+
+class UserService {
+  
   async getUsers() {
     return await User.find();
   }
@@ -22,248 +50,192 @@ class UserService {
     return await User.findByIdAndDelete(id);
   }
 
-  async updateMpin(userId, mpin) {
+  // 🔹 MPIN
+  async updateMpin(userId, data) {
+    const validatedData = validate(updateMpinSchema, data);
+    
+    const hashedMpin = await bcrypt.hash(validatedData.mpin, 10);
 
-    if (!mpin) throw new Error("MPIN is required");
-
-    const hashedMpin = await bcrypt.hash(mpin, 10);
-
-    const updatedUser = await User.findByIdAndUpdate(
+    return await User.findByIdAndUpdate(
       userId,
       { mpin: hashedMpin },
       { new: true }
     );
-
-    return updatedUser;
   }
 
-  async updatePassword(userId, user_password) {
-    console.log(user_password)
-    //user not found
-    if (!user_password) throw new Error("Password is required");
+  // 🔹 PASSWORD
+  async updatePassword(userId, data) {
+    const validatedData = validate(updatePasswordSchema, data);
 
-    const hashedPassword = await bcrypt.hash(user_password, 10);
+    const hashedPassword = await bcrypt.hash(validatedData.password, 10);
 
-    const updatedUser = await User.findByIdAndUpdate(
+    return await User.findByIdAndUpdate(
       userId,
       { password: hashedPassword },
       { new: true }
     );
-
-    return updatedUser;
   }
 
-  // only update name and phone
+  // 🔹 PROFILE
   async updateProfile(userId, data) {
-// data not found
-  if (!data) {
-    throw new Error("No data provided");
-  }
-  // only name, phone  allowedFeilds
-  const allowedFields = ["fullName", "phone","email"];
+    const validatedData = validate(updateProfileSchema, data);
 
-  const updateData = {};
-
-  allowedFields.forEach(field => {
-    if (data[field]) {
-      updateData[field] = data[field];
-    }
-  });
-
-  const updatedUser = await User.findByIdAndUpdate(
-    userId,
-    updateData,
-    { new: true }
-  );
-
-  return updatedUser;
-}
-
-async MobileOtpLogin(mobile)
-{
-  try{
-  const rsponse = await axios.post("http://localhost:3001/v1/notification/send-mobile-otp",
-    {mobile}
-   
-    
-  );
-   return response;
-}catch(error)
-{
-  return error;
-
-}
-
-
-  
-
-}
-async VerifyMobileOtpLogin(mobile,otp)
-{
-  try{
-    const response = await axios.post("http://localhost:3001/v1/notification/send-mobile-otp",{mobile,otp});
-   return response;
-  }catch(err)
-  {
-    throw err;
-  }
-  
-   
-}
-
-async emailOtpLogin(email){
-  try{
-    const response = await axios.post("http://localhost:3001/v1/notification/send-email-otp",{email});
-    return response.data;
-  }catch(error)
-  {
-    throw  error;
+    return await User.findByIdAndUpdate(
+      userId,
+      validatedData,
+      { new: true, runValidators: true }
+    );
   }
 
-}
+  // 🔹 MOBILE OTP SEND
+  async MobileOtpLogin(data) {
+    const validatedData = validate(mobileOtpSchema, data);
 
-async verifyemailOtpLogin(email, otp) {
-  try {
-    
-    const normalizedEmail = email.trim();
-
-    // Call OTP service
     const response = await axios.post(
-      "http://localhost:3001/v1/notification/verify-email-otp",
-      { email: normalizedEmail, otp }
+      "http://localhost:3002/v1/notification/send-mobile-otp",
+      { mobile: validatedData.mobile }
     );
 
-    
-    if (!response || !response.data) {
-      return {
-        success: false,
-        message: "No response from OTP service"
-      };
-    }
+    return response.data;
+  }
 
-    // OTP failed
+  // 🔹 MOBILE OTP VERIFY
+  async VerifyMobileOtpLogin(data) {
+    const validatedData = validate(verifyMobileOtpSchema, data);
+
+    const response = await axios.post(
+      "http://localhost:3002/v1/notification/verify-mobile-otp",
+      validatedData
+    );
+
     if (!response.data.success) {
       return {
         success: false,
-        message: response.data.message || "OTP verification failed"
+        message: response.data.message
       };
     }
 
-    // ind user
-    const user = await User.findOne({ email: normalizedEmail });
+    const user = await User.findOne({ phone: validatedData.mobile });
 
     if (!user) {
-      return {
-        success: false,
-        message: "User not found"
-      };
+      return { success: false, message: "User not found" };
     }
 
-    // generate token
     const token = await jsonwebtoken.createToken(user);
 
-    // Final success response
     return {
       success: true,
       message: "OTP verified successfully",
-      user: {
-        _id: user._id,
-        email: user.email,
-        fullName: user.fullName
-      },
+      user,
       token
     };
+  }
 
-  } catch (err) {
-   
+  // 🔹 EMAIL OTP SEND
+  async emailOtpLogin(data) {
+    const validatedData = validate(emailOtpSchema, data);
+
+    const response = await axios.post(
+      "http://localhost:3002/v1/notification/send-email-otp",
+      validatedData
+    );
+
+    return response.data;
+  }
+
+  // 🔹 EMAIL OTP VERIFY LOGIN
+  async verifyemailOtpLogin(data) {
+    const validatedData = validate(verifyEmailOtpSchema, data);
+
+    const response = await axios.post(
+      "http://localhost:3002/v1/notification/verify-email-otp",
+      validatedData
+    );
+
+    if (!response.data.success) {
+      return {
+        success: false,
+        message: response.data.message
+      };
+    }
+
+    const user = await User.findOne({ email: validatedData.email });
+
+    if (!user) {
+      return { success: false, message: "User not found" };
+    }
+
+    const token = await jsonwebtoken.createToken(user);
+
     return {
-      success: false,
-      message:
-        err.response?.data?.message ||  // API error
-        err.message ||                 // general error
-        "OTP verification failed"
+      success: true,
+      message: "OTP verified successfully",
+      user,
+      token
     };
   }
-}
 
- async setAadhaar(userId, aadhaarId) {
-  try {
-
-    const aadhaarRegex = /^\d{12}$/;
-
-    if (!aadhaarRegex.test(aadhaarId)) {
-      throw new Error("Aadhaar must be exactly 12 digits");
-    }
+  // 🔹 AADHAAR
+  async setAadhaar(userId, data) {
+    const validatedData = validate(aadhaarSchema, data);
 
     const user = await User.findByIdAndUpdate(
       userId,
-      { aadhaarId: aadhaarId ,aadhaarId_verified : true},
+      {
+        aadhaarId: validatedData.aadhaarId,
+        aadhaarId_verified: true
+      },
       { new: true }
     );
 
-    if (!user) {
-      throw new Error("User not found");
-    }
+    if (!user) throw new Error("User not found");
 
     return user;
-
-  } catch (error) {
-    throw error;
   }
-}
-async verifyEmailOtp_for_True(email, otp) {
-    // Call Notification Service
+
+  // 🔹 VERIFY EMAIL FOR TRUE
+  async verifyEmailOtp_for_True(email, otp) {
     const response = await axios.post(
-      "http://localhost:3001/v1/notification/verify-email-otp",
+      "http://localhost:3002/v1/notification/verify-email-otp",
       { email, otp }
     );
 
-    // Check response
-    if (!response.data || !response.data.success) {
-      throw new Error(response.data?.message || "OTP verification failed");
+    if (!response.data.success) {
+      throw new Error("Invalid OTP");
     }
 
-    // Find user
-    const user = await User.findOne({ email });
-    if (!user) {
-      throw new Error("User not found");
-    }
-
-    // Update verification status
-    user.email_verified = true;
-    await user.save();
-
-    return user;
-  }
-
-  async verifyPhoneOtp_for_True(phone, otp) {
-    console.log(phone,otp);
-   
-    const response = await axios.post(
-      "http://localhost:3001/v1/notification/verify-mobile-otp",
-      { phone, otp }
+    const user = await User.findOneAndUpdate(
+      { email },
+      { email_verified: true },
+      { new: true }
     );
-    console.log(response.data);
 
-    // Check response
-    if (!response.data || !response.data.success) {
-      throw new Error(response.data?.message || "OTP verification failed");
-    }
-
-    // Find user
-    const user = await User.findOne({ phone });
-    if (!user) {
-      throw new Error("User not found");
-    }
-
-    // Update verification status
-    user.phone_verified = true;
-    await user.save();
+    if (!user) throw new Error("User not found");
 
     return user;
   }
 
-}
+  // 🔹 VERIFY PHONE FOR TRUE
+  async verifyPhoneOtp_for_True(mobile, otp) {
+    const response = await axios.post(
+      "http://localhost:3002/v1/notification/verify-mobile-otp",
+      { mobile, otp }
+    );
 
+    if (!response.data.success) {
+      throw new Error("Invalid OTP");
+    }
+
+    const user = await User.findOneAndUpdate(
+      { phone: mobile },
+      { phone_verified: true },
+      { new: true }
+    );
+
+    if (!user) throw new Error("User not found");
+
+    return user;
+  }
+}
 
 module.exports = new UserService();
