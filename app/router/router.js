@@ -18,6 +18,7 @@ router.post(routes.v1.user.updatePassword, authMiddleware, authController.update
 
 
 router.post(routes.v1.user.updateProfile,authMiddleware,authController.updateProfile);
+router.get(routes.v1.user.profile, authMiddleware, authController.getProfile);
 router.post(routes.v1.user.forgotPassword,authController.forgotPassword);
 
 router.post(routes.v1.user.resetPassword,authController.resetPassword);

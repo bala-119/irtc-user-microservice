@@ -226,23 +226,38 @@ class AuthController {
       }
       
       const updatedUser = await user_service.updateProfile(req.user.id, validatedData);
-
-      return res.json({
-        success: true,
-        message: "Profile updated successfully",
-        data: updatedUser
-      });
-
-    } catch (error) {
-      if (error.status === 400) {
-        return res.status(400).json(error);
-      }
-      return res.status(400).json({ 
-        success: false, 
-        message: error.message 
-      });
-    }
-  }
+ 
+       return res.json({
+         success: true,
+         message: "Profile updated successfully",
+         data: updatedUser
+       });
+ 
+     } catch (error) {
+       if (error.status === 400) {
+         return res.status(400).json(error);
+       }
+       return res.status(400).json({ 
+         success: false, 
+         message: error.message 
+       });
+     }
+   }
+ 
+   // ✅ GET PROFILE
+   async getProfile(req, res) {
+     try {
+       const user = await user_service.getUserById(req.user.id);
+       if (!user) {
+         return res.status(404).json({ success: false, message: "User not found" });
+       }
+       // Remove sensitive data
+       const { password, ...userWithoutPassword } = user.toObject();
+       return res.json({ success: true, user: userWithoutPassword });
+     } catch (error) {
+       return res.status(500).json({ success: false, message: error.message });
+     }
+   }
 
   // ✅ FORGOT PASSWORD
   async forgotPassword(req, res) {

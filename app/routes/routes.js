@@ -25,6 +25,7 @@
       updateMpin: "/v1/user/update-mpin",
       updatePassword: "/v1/user/update-password",
       updateProfile: "/v1/user/update-profile",
+      profile: "/v1/user/profile",
       forgotPassword: "/v1/user/forgot-password", // it will only send otp to email
       resetPassword: "/v1/user/reset-password",
       MpinLogin: "/v1/user/mpin-login",
