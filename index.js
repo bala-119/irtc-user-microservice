@@ -7,7 +7,10 @@ dotenv.config();
 connectDB("irtc_DB");
 
 const app = express();
-app.use(cors());
+app.use(cors({
+  origin: 'https://bala-119.github.io',
+  credentials: true
+}));
 app.use(express.json());
 
 // IMPORTANT: import router file
@@ -15,7 +18,7 @@ const router = require("./app/router/router");
 
 app.use(router);
 
-const PORT = process.env.PORT;
+const PORT = process.env.PORT || 3001;
 
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
